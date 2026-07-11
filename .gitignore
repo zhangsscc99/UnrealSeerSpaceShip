@@ -1,0 +1,24 @@
+# Unreal Engine
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+.vs/
+.vscode/
+*.sln
+*.suo
+*.xcodeproj
+*.xcworkspace
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Tools / temp
+.tools/
+*.log
+
+# Cursor local (keep mcp.json tracked)
+# .cursor/
