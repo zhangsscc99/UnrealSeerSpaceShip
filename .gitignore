@@ -19,6 +19,8 @@ Desktop.ini
 # Tools / temp
 .tools/
 *.log
+# MCP runtime session id (regenerated each session; don't track)
+mcp_session.txt
 
 # Cursor local (keep mcp.json tracked)
 # .cursor/
