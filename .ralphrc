@@ -14,8 +14,11 @@ CLAUDE_CODE_CMD="claude"
 
 # Loop settings
 MAX_CALLS_PER_HOUR=100
-# Unreal scene work batches many MCP round-trips; a loop needs more than 15 min.
-CLAUDE_TIMEOUT_MINUTES=45
+# Unreal scene work batches many MCP round-trips. There is no bulk transform API,
+# so one sweep of the level's 1745 actors is 1745 serial tool calls: measured
+# 6-12 min per script, and a whole step must fit in a single call.
+# 45 min proved too short -- the first attempt timed out having committed nothing.
+CLAUDE_TIMEOUT_MINUTES=90
 CLAUDE_OUTPUT_FORMAT="json"
 # Token limit per hour (0 = disabled). One invocation can use 100k+ tokens.
 # Recommended: 500000 for light use, 2000000 for heavy use.
