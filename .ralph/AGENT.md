@@ -70,11 +70,30 @@ This is the only sane way to move 1,500+ actors.
 `get_actor_transform` / `set_actor_transform` / `get_actor_bounds`. One actor read
 or write is one serial tool call, so touching all 1,745 actors is 1,745 calls.
 
-**Measured cost: 6–12 minutes per script that sweeps the level.** A single script
-grinding through every actor is expected to take 10–20 minutes — that is not a
-hang, and re-sending it just doubles the cost. Budget ~4–6 script calls per
-90-minute loop, which is why a whole step must be done in **one** script rather
-than split into "measure, then apply".
+**Measured costs (fast paths):**
+
+| Operation | Cost |
+|---|---|
+| `find_actors("SG")` → 845 actors | 11 ms |
+| `get_actor_transform`, per actor | 19 ms (845 actors = 16 s) |
+| `set_actor_transform`, per actor | 2.6 ms (845 actors ≈ 2 s) |
+
+So a full sweep-and-edit of the garden is **~30 seconds**, not minutes. Do the whole
+step in **one** script rather than splitting it into "measure, then apply".
+
+**Avoid these known-slow paths — they are what made the first loop's scripts take
+6–12 minutes each:**
+
+- **Never pass an empty `name` to `find_actors`.** An empty name matches all 1,745
+  actors and is a slow path. Always pass a concrete substring (`"SG"`,
+  `"Pipiwander"`, …).
+- **Do not call `get_actor_bounds` in bulk.** It forces mesh/LOD loads and is very
+  slow. Use `get_actor_transform` instead.
+- `save_assets` may take minutes when many external actor packages must be written.
+  That is expected, not a hang.
+
+**Never re-send a script because it seems quiet.** Re-sending doubles the cost and
+the first one is still running.
 
 ### Gotchas that will otherwise waste a whole loop
 

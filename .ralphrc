@@ -14,11 +14,12 @@ CLAUDE_CODE_CMD="claude"
 
 # Loop settings
 MAX_CALLS_PER_HOUR=100
-# Unreal scene work batches many MCP round-trips. There is no bulk transform API,
-# so one sweep of the level's 1745 actors is 1745 serial tool calls: measured
-# 6-12 min per script, and a whole step must fit in a single call.
-# 45 min proved too short -- the first attempt timed out having committed nothing.
-CLAUDE_TIMEOUT_MINUTES=90
+# Measured: a sweep-and-edit of the garden's 845 actors is ~30s of tool time;
+# the first hour was lost to slow paths (empty-name find_actors, bulk
+# get_actor_bounds) that are now banned in .ralph/AGENT.md. The remaining budget
+# is model latency plus save_assets, which writes 845 external actor packages.
+# 60 min leaves headroom without letting a confused loop grind for hours.
+CLAUDE_TIMEOUT_MINUTES=60
 CLAUDE_OUTPUT_FORMAT="json"
 # Token limit per hour (0 = disabled). One invocation can use 100k+ tokens.
 # Recommended: 500000 for light use, 2000000 for heavy use.
