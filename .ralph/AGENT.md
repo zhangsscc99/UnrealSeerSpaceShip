@@ -64,8 +64,17 @@ Python script that glues tool calls together. Rules:
   `unreal` is **blocked**. `collections` is **not** allowed.
 - Define small helper functions at the top wrapping each `execute_tool` call.
 
-This is the only sane way to move 1,500+ actors. A single script doing work over
-a few thousand actors can take several minutes — that is expected, not a hang.
+This is the only sane way to move 1,500+ actors.
+
+**There is no bulk transform API.** `ActorTools` exposes only per-actor
+`get_actor_transform` / `set_actor_transform` / `get_actor_bounds`. One actor read
+or write is one serial tool call, so touching all 1,745 actors is 1,745 calls.
+
+**Measured cost: 6–12 minutes per script that sweeps the level.** A single script
+grinding through every actor is expected to take 10–20 minutes — that is not a
+hang, and re-sending it just doubles the cost. Budget ~4–6 script calls per
+90-minute loop, which is why a whole step must be done in **one** script rather
+than split into "measure, then apply".
 
 ### Gotchas that will otherwise waste a whole loop
 

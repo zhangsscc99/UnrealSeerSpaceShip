@@ -1,100 +1,138 @@
-# Fix Plan — enlarge the central Suzhou Garden to 4× ground area
+# Fix Plan — 中央园区整体等比放大 2 倍（面积 ×4）
 
-## Goal
+## 目标（已与用户确认，不要改口径）
 
-The **central walkable garden ground itself** becomes 4× larger in area, i.e.
-**linear extent ×2 in X and Y**, with the terrain, paving, walls, building
-clusters, pavilion spacing and waterways all laid out to match.
+把中央园区**整体等比放大 2 倍**：地面铺装、围墙、亭台楼阁、假山、树木、水面——
+**位置与尺寸全部 ×2**。等比放大，不失真。地面面积随之变成 4 倍。
 
-Scattering decorations further out to inflate the bounding box does **not** count
-and has already been done once by mistake. The measure of success is the central
-garden's own X/Y extent doubling.
+用户是在明确对比后选的"等比"：**不是**"建筑保持原尺寸、只把场地铺开"。不要做后者。
 
-## Safety net
+判定标准：中央园区的 X/Y 跨度变为当前的 2 倍。
 
-Commit `c683096` is the known-good restored state (original water, original
-landscape material, no greens, pink roofs kept). **Everything is recoverable from
-it.** That is why you must commit each verified step as you go — a half-finished
-garden must never be the only copy.
+## 安全网
 
-Never `git add -A`. Commit explicit paths.
+- `c683096` = 已知良好恢复点（原始水材质、原始地形材质、无绿色、保留粉顶）。
+- 本次工作之前的最后一次提交是 `56cd5c8`。
+- **每一步做完立刻 commit**。半成品不允许是唯一副本。
 
 ---
 
-## Phase 0 — Measure the baseline (do this first, record the numbers)
+## Phase 0 —— 已完成，结果如下。【不要重新测量】
 
-- [ ] 0.1 Find the centre of the **central garden**. Gather every actor's position,
-      histogram the distance from candidate centres, and identify where the dense
-      original garden ends and the outer ring / far decorations begin. Record the
-      centre `C` and the current half-extent in X and Y in this file.
-- [ ] 0.2 **Establish what the ground actually is.** Determine whether the central
-      garden's walkable ground is the World Partition Landscape, discrete paving
-      meshes, or both. Report: how many actors are Landscape proxies vs. paving
-      static meshes, and which actor(s) provide the surface under the pavilions.
-      Everything downstream depends on this — do not skip it.
-- [ ] 0.3 Record the baseline actor census: total actors, static meshes, 30 pigs,
-      0 `Grn_*`, and the Z range. Note any actor above z≈1200.
-- [ ] 0.4 **Test whether the Landscape can be scaled at all.** Try a small scale
-      change on `Landscape_UAID_A85E45CFE404FBD100_1221515703`, read it back, and
-      undo it. Report whether the World Partition landscape accepts a transform
-      scale, and whether the 64 proxies follow. If it does not, say so here — the
-      approach changes and this is exactly the kind of thing worth discovering in
-      loop 1 rather than loop 9.
+以下是用 30 多分钟工具时间换来的数据，直接使用：
 
-## Phase 1 — Enlarge the ground
+**Actor 标签前缀结构**（全关卡 1745 个 actor，716 个不同标签）：
 
-- [ ] 1.1 Scale the terrain to twice its X/Y linear extent about `C`.
-      Keep it uniform per axis-pair as the asset allows; if the landscape resists
-      scaling, stop and record the blocker rather than forcing it.
-- [ ] 1.2 Enlarge the paving / ground meshes to cover the new extent, so there is
-      no gap between the paving and the terrain behind it.
-- [ ] 1.3 Verify: the ground's measured X/Y extent is ~2× baseline, and there is no
-      hole or seam where the old garden edge used to be.
+| 前缀 | 含义 | 数量 |
+|---|---|---|
+| `SG_` `SGO_` `SGW_` `SGE_` `SGN_` `SGS_` | **中央园区**（这就是要放大的对象） | 845 |
+| `OR*` `ORF_*` `OR2_*` `GEX_*` | 外环（**不要动**） | 711 |
+| `PipiWander_#` | 皮皮（猪） | 30 |
 
-## Phase 2 — Respace the garden content
+**各分组实测包围盒**：
 
-- [ ] 2.1 Move every actor of the **central garden** to `C + 2 × (old - C)` in X/Y.
-      Use one batched script. Keep a record of every old→new transform.
-- [ ] 2.2 Decide size vs. spacing per category and record the decision:
-      pavilions, towers, corridors and walls keep their own size and spread out;
-      long runs (walls, corridors, paving strips, banks) are scaled to span the
-      larger gaps. **Never non-uniformly scale a mesh.**
-- [ ] 2.3 Re-seat everything on the terrain: trace down at each new X/Y and set Z.
-- [ ] 2.4 Verify: no actor floats above z≈1200; actor density over the enlarged
-      ground looks comparable to before, not sparse or overlapping.
+```
+GARDEN   n=845  x[-4385.3, 4720]  y[-4460, 4780]  z[-315.7, 3000]  中心(167.3, 160.0)
+OUTER    n=711  x[-14100, 14100]  y[-13450, 13450]                 中心(0, 0)
+PIG      n=30   x[-2800, 2800]    y[-2600, 600]   z[136.7, 541.4]  无飞天
+OTHER    n=159  HLOD/地形代理等，跨度 ±100800（关卡自身的网格）
+```
 
-## Phase 3 — Waterways
+**中央园区的地面是铺装网格，不是地形**（这是关键结论）：
 
-- [ ] 3.1 Scale and reposition the water to match: `WaterZone_UAID_00163E6E452288F802_1311752325`,
-      `Landscape_WaterBrushManager_0`, and the water surface meshes.
-- [ ] 3.2 Keep the banks, the water surface and the water zone consistent with each
-      other — a water plane that no longer meets its bank is a failure.
-- [ ] 3.3 Verify the water still reads as water and that **`M_SG_Water` was not
-      modified** (`git status` must not list it).
+```
+SG_Ground    (-3000, -2250, -10) → (3000, 2250, 0)     6000 × 4500
+SGS_Ground   (-1600, -3300,   0) → (1600, -1500, 80)   南
+SGW_Ground   (-3300, -1600,   0) → (-1500, 1600, 80)   西
+SGE_Ground   ( 1500, -1600,   0) → ( 1600, 1600, 80)   东
+SGN_Ground   (-1600,  1500,   0) → ( 1600, 3300, 80)   北
+```
 
-## Phase 4 — Pigs, sky and dressing
+围墙：`SG_Wall_N/S/E/W` 位于 ±3000 / ±2250，scale 约 (0.4, 45, 4.5)，
+`SG_Wall*_Cap` 在 z=460，`SG_WallRoof_*` 在 z=405，scale 37.8。
 
-- [ ] 4.1 Re-seat the 30 pigs on the new ground so `BP_PigWander` still works and
-      their wander centres are on solid ground.
-- [ ] 4.2 Confirm sky/fog/lighting actors still make sense for the enlarged level.
-- [ ] 4.3 Confirm dressing (rocks, plants, bamboo) is respaced with the rest and
-      nothing is left straddling the old garden boundary.
+**关键实体**：
 
-## Phase 5 — Final verification and commit
+| 对象 | Actor |
+|---|---|
+| Landscape（World Partition，64 个代理） | `Landscape_UAID_A85E45CFE404FBD100_1221515703`，位置 (-100800,-100800,100)，scale 100 |
+| WaterZone | `WaterZone_UAID_00163E6E452288F802_1311752325` |
+| 地形水刷 | `Landscape_WaterBrushManager_0` |
 
-- [ ] 5.1 Measure and record the final X/Y extent. It must be **~2× baseline**.
-- [ ] 5.2 Confirm the constraints still hold: 0 `Grn_*` actors, landscape material
-      still `/Game/Landscape/Materials/M_Landscape`, `M_SG_Water` untouched,
-      pink-roof fix intact, 30 pigs on the ground.
-- [ ] 5.3 `save_assets`, then commit the level changes with explicit paths and a
-      message summarising the old and new extents.
-- [ ] 5.4 Write the before/after numbers into this file so the next loop and the
-      user can see what actually changed.
+## Phase 1 —— 一次相似变换搞定（核心步骤）
 
-## Blockers / findings
+**数学**：设园区中心 `C = (167.3, 160.0)`，Z 以 **z=0（地面）** 为基准缩放。
+对每个入选 actor：
 
-Record anything that turned out to be impossible or different from the assumption
-above. A well-evidenced "this cannot be done this way, here is what happens
-instead" is a good loop, not a failed one.
+```
+新位置.x = 167.3 + 2 × (旧位置.x − 167.3)
+新位置.y = 160.0 + 2 × (旧位置.y − 160.0)
+新位置.z = 2 × 旧位置.z
+新缩放   = 旧缩放 × 2          # 三个轴都乘 2（等比，不失真）
+```
 
-- (none yet)
+**为什么 Z 必须以 0 为基准、而不是以 Z 中心为基准**：园区 z 范围是 [-315.7, 3000]，
+中心在 1342 附近。若绕 Z 中心缩放，地面会掉到 -2684，整个园区沉到地下。
+绕 z=0 缩放则地面留在 0，一切从地面往上长——这才是"等比放大"该有的行为。
+
+**为什么绕同一个 C 等比缩放是安全的**：这是相似变换，任意两个 actor 之间的相对
+关系（相邻、相接、重叠、间距）都被**精确保持**。所以铺装板块之间不会出现缝隙，
+墙与墙仍相接，不需要重新贴地、不需要补缝。**不要**分步（先地面后建筑）做，中间态
+会不自洽。
+
+**入选规则**（必须同时满足）：
+
+1. 是 `StaticMeshActor`（refPath 含 `StaticMeshActor`），或标签以 `PipiWander` 开头；
+2. XY 落在园区核心框内：`|x − 167.3| ≤ 5200` 且 `|y − 160.0| ≤ 5200`。
+
+**必须排除**（否则会毁掉地形/HLOD）：
+`Landscape*`、`LandscapeStreamingProxy_*`、`HLOD0_Instancing*`、
+`Landscape_WaterBrushManager_0`、`WorldSettings`、`WorldDataLayers`、`Brush*`、
+`BuoyancyManager0`、`DefaultPhysicsVolume0`、`GameplayDebuggerPlayerManager0`、
+`AbstractNavData*`、`SkyAtmosphere*`、`SkyLight*`、`ExponentialHeightFog*`、
+`PlayerStart*`。
+
+**预期入选数量约 845–880 个。** 这是自检线：
+- 若返回数量远低于 800 或远高于 950，**不要应用**，把实际数量和分类样本写进本文件、
+  提交，然后停下来说明原因。
+- 数量正常才执行应用。
+
+- [ ] 1.1 先只做**试算**（dry-run）：按上述规则选出 actor、算出新变换、**只报告**
+      入选数量与前后的包围盒对比，不写入。
+- [ ] 1.2 确认数量在 845–880 区间后，在**同一个脚本**里真正应用（`set_actor_transform`，
+      worldspace=true），并返回改动数量与新的包围盒。
+- [ ] 1.3 把 C、缩放公式、入选规则、实际改动数量、前后包围盒**立刻写进本文件**。
+- [ ] 1.4 `save_assets` → 然后 commit（只提交 level / external actor 相关路径）。
+
+> 性能提醒：这个脚本要逐个 actor 调 `set_actor_transform`，**单次跑 10–20 分钟是正常的**，
+> 不是卡死。整个 Phase 1 允许耗掉一轮的大部分预算。
+
+## Phase 2 —— 水与皮皮
+
+- [ ] 2.1 `WaterZone_UAID_00163E6E452288F802_1311752325` 单独按同一公式变换
+      （它不在 StaticMeshActor 集合里）。变换后确认西侧荷塘（`SGW_Lotus_#`）仍在水域范围内。
+- [ ] 2.2 皮皮的游荡半径：`BP_PigWander` 上的 `WanderRadius` 变量要跟着 ×2，
+      否则 30 只猪会挤在一个小圈里。若查不到该变量，记录为待办而不是瞎改。
+- [ ] 2.3 确认皮皮仍贴地（z ≤ 约 1100），且 `BP_PigWander` 仍在 Tick。
+
+## Phase 3 —— 验证与提交
+
+- [ ] 3.1 重新测量中央园区（同样的入选规则）的 X/Y 跨度，必须≈基线 2 倍
+      （基线 xspan 9105.3 / yspan 9240）。
+- [ ] 3.2 抽检若干亭台楼阁：缩放应为原来的 2 倍，且底面仍贴地。
+- [ ] 3.3 确认约束仍成立：0 个 `Grn_*`、地形材质仍是 `M_Landscape`、
+      `M_SG_Water` 未被改动（`git status` 不应列出它）、粉顶修复仍在、30 只皮皮还在。
+- [ ] 3.4 `save_assets` → commit，提交说明写清前后跨度。
+- [ ] 3.5 把前后数字写进本文件，供用户查看。
+
+## 已知副作用（不是 bug，不要"修"）
+
+- 外环（`OR*`/`GEX_*`，±11000 ~ ±14100）**不动**。园区放大到约 ±9100 后会贴近外环，
+  间距变小属预期。
+- 地形（Landscape）**不动**。园区地面是铺装网格，跟着 ×2；铺装厚度 80 → 160 单位
+  （0.8m → 1.6m），在 9km 尺度上可忽略。
+- 园区 z 最高处原来 3000（有 1 个 actor 在 z>1200），放大后到 6000。这是等比的必然结果。
+
+## Blockers / findings（记录任何与上述假设不符的情况）
+
+- （暂无）

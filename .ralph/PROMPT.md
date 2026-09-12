@@ -12,20 +12,55 @@ whole loop, and how to save/revert/commit safely.
 
 ## Current Objectives
 
-**The single task: enlarge the central Suzhou Garden so its ground area is 4×
-larger than it is now.**
+**The single task: enlarge the central Suzhou Garden to 4× its ground area.**
 
-A larger map was previously attempted by scattering decorations far out to inflate
-the bounding box. That is **not** what is wanted. What is wanted is the **central
-walkable garden ground itself** — the terrain, the paving, the walls, the building
-clusters, the pavilion spacing and the waterways — laid out 4× larger.
+The user has chosen the method explicitly: **scale the whole central garden
+uniformly by 2×** — positions *and* sizes, on all three axes. Everything in the
+central garden (paving, walls, pavilions, rocks, trees, water) doubles. Equal
+proportions, no distortion, ground area becomes 4×.
 
-Target: **linear extent ×2 in X and Y ⇒ ground area ×4.** Measure the garden's
-current X/Y extent first, and re-measure at the end; the numbers are the
-acceptance test.
+They were shown the alternative ("keep the buildings the same size, just spread
+the grounds out") and rejected it. **Do not do that instead.**
+
+A still earlier attempt scattered decorations far out to inflate the bounding box.
+That was also rejected. The central garden itself must get bigger.
+
+**`.ralph/fix_plan.md` Phase 0 is already done — the baseline measurements are in
+that file. Do not re-measure them.** That measurement cost over 30 minutes of tool
+time and was lost once already. Read it, use it, move on to Phase 1.
 
 Work through `.ralph/fix_plan.md` one item per loop and keep it up to date — it is
 your memory across loops.
+
+## 性能现实 — 这一条决定成败
+
+**没有批量接口。** `ActorTools` 只有逐个 actor 的 `get_actor_transform` /
+`set_actor_transform` / `get_actor_bounds`。读取或移动 1745 个 actor 就要发
+1745 次串行调用。
+
+实测代价：**每个脚本调用 6–12 分钟**。遍历全关卡的"测量"脚本要 10 分钟以上。
+一次 90 分钟的预算只够跑 4–6 个脚本调用。上一次尝试就是这样烧掉 45 分钟、
+一个字节都没提交的。
+
+因此：
+
+- **一个步骤 = 一个脚本。** 把选中、计算、应用、统计全部放进同一次
+  `execute_tool_script` 调用里。不要把一个步骤拆成"先测量、再应用"两次调用。
+- **不要重复测量已知的东西**（见 fix_plan.md Phase 0）。
+- 脚本跑 10–20 分钟是**正常**的，不是卡死。不要因为"没反应"就重发。
+
+## 落盘纪律 — 每一步做完立刻保存并提交
+
+上一轮最大的教训：模型把发现攒着，准备"最后一起写"，结果超时被杀，**全部丢失**。
+
+所以，**每次拿到有用的结果，立刻按这个顺序做，然后再做别的事**：
+
+1. 把数字/结论**追加**进 `.ralph/fix_plan.md`；
+2. 若改了场景，先 `save_assets`；
+3. `git add <具体路径>` → `git commit`。
+
+不要等到一个 Phase 结束才提交。宁可提交 5 次小的，也不要一次都没有。
+每一轮结束时，工作树里不允许存在未被记录的发现。
 
 ## Hard constraints (do not violate these)
 
@@ -106,5 +141,13 @@ passes.
 
 ## Current Task
 
-Read `.ralph/fix_plan.md` and implement the most important unfinished item. Start
-by measuring the garden's current extent if that has not been recorded yet.
+Read `.ralph/fix_plan.md`. **Phase 0 is complete — its measurements are recorded
+there; do not redo them.**
+
+Start at **Phase 1**: the single similarity transform. First a dry-run that only
+reports the selected actor count and the before/after bounds; if the count is in
+the expected 845–880 band, apply it in the following script, then `save_assets`
+and commit — and write the numbers into fix_plan.md *before* doing anything else.
+
+Counts far outside that band mean the selection rule is wrong: record and report
+that instead of applying.
