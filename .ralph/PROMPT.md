@@ -38,16 +38,26 @@ your memory across loops.
 `set_actor_transform` / `get_actor_bounds`。读取或移动 1745 个 actor 就要发
 1745 次串行调用。
 
-实测代价：**每个脚本调用 6–12 分钟**。遍历全关卡的"测量"脚本要 10 分钟以上。
-一次 90 分钟的预算只够跑 4–6 个脚本调用。上一次尝试就是这样烧掉 45 分钟、
-一个字节都没提交的。
+实测代价（**已实测，不要再用猜测的数字**）：
+
+| 操作 | 实测 |
+|---|---|
+| `find_actors("SG")` → 845 个 | 11 ms |
+| `get_actor_transform`，每个 | 19 ms（845 个 = 16 s） |
+| `set_actor_transform`，每个 | 2.6 ms |
+| **真正改变值的** 876 个整体变换 + 回读 | **≈ 6.6 分钟** |
+
+空转的写只要 2.6 ms，但**真写入会连带失效空间索引 / HLOD**，所以整套落地的
+代价是**分钟级**，不是秒级。这个差别曾让第一轮估错预算。
 
 因此：
 
 - **一个步骤 = 一个脚本。** 把选中、计算、应用、统计全部放进同一次
   `execute_tool_script` 调用里。不要把一个步骤拆成"先测量、再应用"两次调用。
 - **不要重复测量已知的东西**（见 fix_plan.md Phase 0）。
-- 脚本跑 10–20 分钟是**正常**的，不是卡死。不要因为"没反应"就重发。
+- 脚本跑几分钟是**正常**的，不是卡死。不要因为"没反应"就重发。
+- 慢路径见 `.ralph/AGENT.md`：**空 name 的 `find_actors`**、**批量
+  `get_actor_bounds`** —— 这两个才是把脚本拖到 6–12 分钟的元凶，已禁用。
 
 ## 落盘纪律 — 每一步做完立刻保存并提交
 
@@ -141,13 +151,22 @@ passes.
 
 ## Current Task
 
-Read `.ralph/fix_plan.md`. **Phase 0 is complete — its measurements are recorded
-there; do not redo them.**
+> ## ✅ 任务已完成 —— 不要再做任何场景改动
+>
+> 中央园区已经**整体等比放大 2 倍**（面积 4 倍），已 `save_assets`、已提交
+> **`2a7ae06`**。实测 X/Y 跨度 **18210.61 / 18480.0**，是基线 9105.3 / 9240 的
+> **恰好 2.0000 倍**。
+>
+> **绝对不要再次应用 Phase 1 的变换。** 入选数量仍然是 845，所以
+> "845–880 区间"这个检查**拦不住重复应用**——再跑一次会把园区变成 4 倍线性
+> （16 倍面积），毁掉已完成的结果。
+>
+> 剩下的 Phase 2 / Phase 3 也都已完成（见 `.ralph/fix_plan.md`）。
+> **若本循环被启动，唯一正确的动作是读一遍 `.ralph/fix_plan.md` 确认全部 `[x]`，
+> 然后立刻输出 `EXIT_SIGNAL: true` 结束，不要调用任何 MCP 工具。**
 
-Start at **Phase 1**: the single similarity transform. First a dry-run that only
-reports the selected actor count and the before/after bounds; if the count is in
-the expected 845–880 band, apply it in the following script, then `save_assets`
-and commit — and write the numbers into fix_plan.md *before* doing anything else.
+Read `.ralph/fix_plan.md`. Phase 0/1/2/3 are **all complete**. Do not redo them,
+do not re-measure, and do not touch the level.
 
-Counts far outside that band mean the selection rule is wrong: record and report
-that instead of applying.
+If anything looks inconsistent, **record it in `fix_plan.md` and stop** — do not
+"fix" it by transforming actors.

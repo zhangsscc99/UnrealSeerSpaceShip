@@ -78,8 +78,15 @@ or write is one serial tool call, so touching all 1,745 actors is 1,745 calls.
 | `get_actor_transform`, per actor | 19 ms (845 actors = 16 s) |
 | `set_actor_transform`, per actor | 2.6 ms (845 actors ≈ 2 s) |
 
-So a full sweep-and-edit of the garden is **~30 seconds**, not minutes. Do the whole
-step in **one** script rather than splitting it into "measure, then apply".
+Those per-call numbers are for **reads and no-op writes**. A write that actually
+**changes** a transform also invalidates spatial structures / HLOD, so the real
+cost is much higher: the 876-actor transform that actually landed (plus read-back
+verification) took **≈ 6.6 minutes**. Read-only sweeps are seconds; real edits are
+minutes. Budget accordingly.
+
+Do the whole step in **one** script rather than splitting it into "measure, then
+apply" — the split doubles the actor walks and the second script can run against
+a half-applied scene.
 
 **Avoid these known-slow paths — they are what made the first loop's scripts take
 6–12 minutes each:**
