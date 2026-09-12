@@ -159,9 +159,62 @@ SGN_Ground   北  (-1600, 1500,0) → ( 1600, 3300,80)
 
 ## Phase 2 —— 皮皮游荡半径
 
-- [ ] 2.1 `BP_PigWander` 上的 `WanderRadius` 要跟着 ×2，否则 30 只猪挤在一个小圈里。
-      查不到该属性就记录为待办，不要瞎改。
-- [ ] 2.2 确认皮皮仍贴地、`BP_PigWander` 仍在 Tick。
+- [x] 2.1 **结论：没有可 ×2 的存量参数，不改。** 详见下方实测。
+- [x] 2.2 皮皮仍贴地（几何自洽）、`BP_PigWander` tick 配置正常。✅
+
+### Phase 2 实测结果（回读自编辑器，本循环无场景改动）
+
+**2.1 `WanderRadius` —— 属性存在，但实例与 CDO 上**全都是 0**：**
+
+`BP_PigWander` 的变量表（`BlueprintTools.list_variables`）：
+`Center` / `Target` / `GroundZ` / `WanderRadius` / `MoveSpeed`。
+
+| 读取对象 | WanderRadius | MoveSpeed | GroundZ | Center |
+|---|---|---|---|---|
+| 30 个皮皮实例（逐个回读，去重后各只有 1 个值） | **0** | **0** | **0** | **(0,0,0)** |
+| CDO `BP_PigWander.Default__BP_PigWander_C` | **0** | **0** | **0** | **(0,0,0)** |
+
+实例值与 CDO 默认值**完全一致**，即没有任何一个皮皮覆盖过这些参数。
+
+→ **存量值全是 0，×2 之后还是 0，所以"把 WanderRadius 跟着 ×2"这个动作是空操作。**
+按任务约定（"查不到该属性就记录为待办，不要瞎改"），**不做任何修改**。
+
+**未确认项（记为待办，不猜测）**：`read_graph_dsl` 对
+`BP_PigWander:EventGraph` / `:UserConstructionScript` / `:WanderStep` 三个图
+**都返回空串（len=0）**，尽管 `list_graphs` 能正常列出它们、
+`list_functions` 也报告 `WanderStep` 是 `bIsImplemented: true`。
+所以**无法确认游荡逻辑是否在图里用一个字面量给 `WanderRadius` 赋值**。
+
+- 若图里是字面量（例如 `Set WanderRadius = 1500`），那么它的值是**存在图字节码里**、
+  不是 actor 属性，本次相似变换**本来就不该也无法**去改它；而且 `Center` 若在
+  BeginPlay 时取 `GetActorLocation()`，皮皮现在就在**已经正确 ×2 的各自位置**上游荡，
+  不存在"挤成一小圈"。
+- 若将来图读取器修好了、或发现 `Center` 确实是**固定世界坐标**而没被 ×2，
+  那才需要回来处理。
+
+**2.2 皮皮变换回读（30 个，全部逐轴校验）**：
+
+| 指标 | 值 | 判定 |
+|---|---|---|
+| n | 30 | 健在 ✅ |
+| 缩放 | **全部恰好 (2, 2, 2)**，去重后只有 1 种 | 等比，**非等比个数 = 0**（约束 4 ✅） |
+| x 范围 | [-5767.3, 5432.7] | 与公式预测（pre x[-2800,2800] 绕 C 放大）**精确吻合** ✅ |
+| y 范围 | [-5360, 1040] | 同上 ✅ |
+| z 范围 | [273.462, 1082.882] | z/2 = **[136.73, 541.44]** = Phase 0 记录的 pre 值 **[136.7, 541.4]** ✅ |
+| z<0 个数 | **0** | 无穿地 ✅ |
+| z>1200 个数 | **0**（max 1082.882） | 无飞天 ✅ |
+
+**贴地成立的理由（几何自洽，不是"看着像"）**：z 恰好是 pre 值的 2 倍——
+这正是"皮皮与它脚下的园内表面同属一个相似变换"的必然结果（地面铺装绕 z=0 放大，
+z=0 保持 z=0，站上去的东西 z 翻倍、尺寸也翻倍）。**z 不是被单独拍进去的**，
+它和 845 个园区 actor 用的是同一个公式、同一组系数。
+
+**tick 配置（首个皮皮，30 个共用同一 CDO）**：
+`bStartWithTickEnabled = true`、`tickInterval = 0`（每帧）、`tickGroup = TG_PrePhysics`、
+`bTickEvenWhenPaused = false`；`bHidden = false`、`bIsEditorOnlyActor = false`
+→ **actor 正常、tick 在起始即启用，`BP_PigWander` 未被本次改动破坏** ✅
+（注意：编辑器非 PIE 状态下 tick 不会真的跑，所以这是**配置层**的证据，不是运行时观察。
+要拿到运行时证据需要起 PIE，本轮未做。）
 
 ## Phase 3 —— 验证与提交
 
