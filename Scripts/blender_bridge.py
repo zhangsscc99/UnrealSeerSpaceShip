@@ -21,7 +21,7 @@ import sys
 HOST, PORT = "127.0.0.1", 9876
 
 
-def call(payload, timeout=180):
+def call(payload, timeout=900):
     with socket.create_connection((HOST, PORT), timeout=timeout) as s:
         s.sendall(json.dumps(payload).encode("utf-8"))
         buf = b""
