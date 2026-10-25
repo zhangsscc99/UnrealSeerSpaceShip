@@ -26,3 +26,6 @@ mcp_session.txt
 # .cursor/
 
 BuildSetup/
+
+# Raw downloaded 3D sources (processed/ is tracked instead)
+3dModelResources/*.glb
