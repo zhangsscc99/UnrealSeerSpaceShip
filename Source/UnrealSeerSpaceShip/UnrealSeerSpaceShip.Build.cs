@@ -12,6 +12,7 @@ public class UnrealSeerSpaceShip : ModuleRules
 			"CoreUObject",
 			"Engine",
 			"InputCore",
+			"EnhancedInput",
 		});
 	}
 }
