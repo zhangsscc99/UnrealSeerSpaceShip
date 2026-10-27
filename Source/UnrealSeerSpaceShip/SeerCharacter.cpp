@@ -25,6 +25,12 @@ ASeerCharacter::ASeerCharacter()
 	Move->bOrientRotationToMovement = true;
 	Move->RotationRate = FRotator(0.f, 640.f, 0.f);
 
+	// Jumping: one hop from the ground, a second kick in the air.
+	Move->JumpZVelocity = 620.f;
+	Move->AirControl = 0.6f;
+	Move->GravityScale = 1.6f;
+	JumpMaxCount = 2;
+
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
@@ -112,6 +118,10 @@ void ASeerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	// mappings live in Config/DefaultInput.ini.
 	PlayerInputComponent->BindAxis(TEXT("MoveForward"), this, &ASeerCharacter::MoveForward);
 	PlayerInputComponent->BindAxis(TEXT("MoveRight"), this, &ASeerCharacter::MoveRight);
+
+	// ACharacter::Jump respects JumpMaxCount, so the same binding gives the double jump.
+	PlayerInputComponent->BindAction(TEXT("Jump"), IE_Pressed, this, &ACharacter::Jump);
+	PlayerInputComponent->BindAction(TEXT("Jump"), IE_Released, this, &ACharacter::StopJumping);
 }
 
 void ASeerCharacter::Move(const FInputActionValue& Value)
