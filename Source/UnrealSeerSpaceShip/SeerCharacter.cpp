@@ -7,18 +7,28 @@
 #include "Engine/SkeletalMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "UObject/ConstructorHelpers.h"
 
+namespace
+{
+	constexpr float MinPitch = -70.f;
+	constexpr float MaxPitch = 20.f;
+
+	// Pixels of finger drag per degree of camera rotation.
+	constexpr float TouchDegPerPixel = 0.18f;
+
+	constexpr float GamepadLookRate = 120.f; // degrees per second at full deflection
+}
+
 ASeerCharacter::ASeerCharacter()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
-	UCapsuleComponent* Capsule = GetCapsuleComponent();
-	Capsule->InitCapsuleSize(34.f, 88.f);
+	GetCapsuleComponent()->InitCapsuleSize(34.f, 88.f);
 
-	// Walk, do not fly: gravity plus the floor keeps the character on the ground.
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	Move->MaxWalkSpeed = 520.f;
 	Move->BrakingDecelerationWalking = 2400.f;
@@ -35,7 +45,6 @@ ASeerCharacter::ASeerCharacter()
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	// The robot mesh: origin is at the feet, and the source FBX is 100x too large.
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> SeerMesh(
 		TEXT("/Game/SeerLab/Characters/SK_Seer.SK_Seer"));
 	if (SeerMesh.Succeeded())
@@ -46,18 +55,24 @@ ASeerCharacter::ASeerCharacter()
 		GetMesh()->SetRelativeScale3D(FVector(0.01739f));
 	}
 
-	// Fixed 2.5D camera: absolute location/rotation, so it ignores the pawn's transform.
-	FixedCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FixedCam"));
-	FixedCamera->SetupAttachment(RootComponent);
-	FixedCamera->SetUsingAbsoluteLocation(true);
-	FixedCamera->SetUsingAbsoluteRotation(true);
-	FixedCamera->SetUsingAbsoluteScale(true);
-	FixedCamera->SetRelativeLocation(FVector(0.f, -1250.f, 1150.f));
-	FixedCamera->SetRelativeRotation(FRotator(-45.f, 90.f, 0.f));
-	FixedCamera->FieldOfView = 90.f;
-	FixedCamera->bUsePawnControlRotation = false;
+	// Third-person chase camera: a spring arm keeps the camera behind the character,
+	// lags slightly while moving, and pulls in when a wall blocks the view.
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom->SetupAttachment(RootComponent);
+	CameraBoom->SetRelativeLocation(FVector(0.f, 0.f, 70.f));
+	CameraBoom->bUsePawnControlRotation = true;
+	CameraBoom->bInheritPitch = true;
+	CameraBoom->bInheritYaw = true;
+	CameraBoom->bInheritRoll = false;
+	CameraBoom->bEnableCameraLag = true;
+	CameraBoom->CameraLagSpeed = 12.f;
+	CameraBoom->bDoCollisionTest = true;
 
-	// Existing project input assets; A/D feed X and W/S feed Y through swizzle modifiers.
+	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	FollowCamera->bUsePawnControlRotation = false;
+	FollowCamera->FieldOfView = 80.f;
+
 	static ConstructorHelpers::FObjectFinder<UInputAction> MoveAsset(
 		TEXT("/Game/Input/IA_Move.IA_Move"));
 	if (MoveAsset.Succeeded())
@@ -65,17 +80,10 @@ ASeerCharacter::ASeerCharacter()
 		MoveAction = MoveAsset.Object;
 	}
 
-	// Constructor-time asset loading has to go through ConstructorHelpers; LoadObject
-	// silently returns null while the CDO is being built.
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> ContextA(
-		TEXT("/Game/Input/IMC_A.IMC_A"));
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> ContextD(
-		TEXT("/Game/Input/IMC_D.IMC_D"));
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> ContextW(
-		TEXT("/Game/Input/IMC_W.IMC_W"));
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> ContextS(
-		TEXT("/Game/Input/IMC_S.IMC_S"));
-
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> ContextA(TEXT("/Game/Input/IMC_A.IMC_A"));
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> ContextD(TEXT("/Game/Input/IMC_D.IMC_D"));
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> ContextW(TEXT("/Game/Input/IMC_W.IMC_W"));
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> ContextS(TEXT("/Game/Input/IMC_S.IMC_S"));
 	for (const auto& Finder : { &ContextA, &ContextD, &ContextW, &ContextS })
 	{
 		if (Finder->Succeeded())
@@ -101,50 +109,141 @@ void ASeerCharacter::BeginPlay()
 					Subsystem->AddMappingContext(Context, 0);
 				}
 			}
-			UE_LOG(LogTemp, Warning, TEXT("SeerCharacter: %d mapping contexts registered, MoveAction=%s"),
-				MappingContexts.Num(), MoveAction ? TEXT("yes") : TEXT("no"));
-			return;
 		}
 	}
-	UE_LOG(LogTemp, Error, TEXT("SeerCharacter: no player controller / input subsystem in BeginPlay"));
+
+	ApplyCameraPreset(0);
 }
 
 void ASeerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	// Enhanced Input never fires in this project (the graph nodes and the C++ binding
-	// both stay silent), so movement is bound through the legacy axis path, whose
-	// mappings live in Config/DefaultInput.ini.
 	PlayerInputComponent->BindAxis(TEXT("MoveForward"), this, &ASeerCharacter::MoveForward);
 	PlayerInputComponent->BindAxis(TEXT("MoveRight"), this, &ASeerCharacter::MoveRight);
+	PlayerInputComponent->BindAxis(TEXT("Turn"), this, &ASeerCharacter::Turn);
+	PlayerInputComponent->BindAxis(TEXT("LookUp"), this, &ASeerCharacter::LookUp);
+	PlayerInputComponent->BindAxis(TEXT("TurnRate"), this, &ASeerCharacter::TurnRate);
+	PlayerInputComponent->BindAxis(TEXT("LookUpRate"), this, &ASeerCharacter::LookUpRate);
 
-	// ACharacter::Jump respects JumpMaxCount, so the same binding gives the double jump.
 	PlayerInputComponent->BindAction(TEXT("Jump"), IE_Pressed, this, &ACharacter::Jump);
 	PlayerInputComponent->BindAction(TEXT("Jump"), IE_Released, this, &ACharacter::StopJumping);
+	PlayerInputComponent->BindAction(TEXT("CycleCamera"), IE_Pressed, this, &ASeerCharacter::CycleCamera);
+
+	PlayerInputComponent->BindTouch(IE_Pressed, this, &ASeerCharacter::TouchStarted);
+	PlayerInputComponent->BindTouch(IE_Repeat, this, &ASeerCharacter::TouchMoved);
+	PlayerInputComponent->BindTouch(IE_Released, this, &ASeerCharacter::TouchEnded);
 }
 
 void ASeerCharacter::Move(const FInputActionValue& Value)
 {
 	const FVector2D Axis = Value.Get<FVector2D>();
-
-	// The camera looks along +Y with screen-right at -X, so map the 2D input onto that basis.
-	AddMovementInput(FVector(0.f, 1.f, 0.f), Axis.Y);
-	AddMovementInput(FVector(-1.f, 0.f, 0.f), Axis.X);
+	MoveForward(Axis.Y);
+	MoveRight(Axis.X);
 }
 
 void ASeerCharacter::MoveForward(float Value)
 {
-	if (Value != 0.f)
+	if (Controller && FMath::Abs(Value) > KINDA_SMALL_NUMBER)
 	{
-		AddMovementInput(FVector(0.f, 1.f, 0.f), Value);
+		const FRotator Yaw(0.f, Controller->GetControlRotation().Yaw, 0.f);
+		AddMovementInput(Yaw.Vector(), Value);
 	}
 }
 
 void ASeerCharacter::MoveRight(float Value)
 {
-	if (Value != 0.f)
+	if (Controller && FMath::Abs(Value) > KINDA_SMALL_NUMBER)
 	{
-		AddMovementInput(FVector(-1.f, 0.f, 0.f), Value);
+		const FRotator Yaw(0.f, Controller->GetControlRotation().Yaw, 0.f);
+		AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y), Value);
+	}
+}
+
+void ASeerCharacter::Turn(float Value)
+{
+	AddControllerYawInput(Value);
+}
+
+void ASeerCharacter::LookUp(float Value)
+{
+	ApplyLookDelta(0.f, Value);
+}
+
+void ASeerCharacter::TurnRate(float Value)
+{
+	AddControllerYawInput(Value * GamepadLookRate * GetWorld()->GetDeltaSeconds());
+}
+
+void ASeerCharacter::LookUpRate(float Value)
+{
+	ApplyLookDelta(0.f, Value * GamepadLookRate * GetWorld()->GetDeltaSeconds());
+}
+
+void ASeerCharacter::CycleCamera()
+{
+	ApplyCameraPreset((CameraPreset + 1) % 2);
+}
+
+void ASeerCharacter::ApplyCameraPreset(int32 Index)
+{
+	CameraPreset = FMath::Clamp(Index, 0, 1);
+	CameraBoom->TargetArmLength = (CameraPreset == 0) ? 450.f : 900.f;
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		FRotator Rot = PC->GetControlRotation();
+		Rot.Pitch = (CameraPreset == 0) ? -14.f : -28.f;
+		PC->SetControlRotation(Rot);
+	}
+}
+
+void ASeerCharacter::ApplyLookDelta(float DeltaYaw, float DeltaPitch)
+{
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		FRotator Rot = PC->GetControlRotation();
+		Rot.Yaw += DeltaYaw;
+		Rot.Pitch = FMath::ClampAngle(Rot.Pitch + DeltaPitch, MinPitch, MaxPitch);
+		PC->SetControlRotation(Rot);
+	}
+}
+
+void ASeerCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVector Location)
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	// bUseMouseForTouch makes the desktop mouse emit touches too; the mouse axes
+	// already drive the camera there, so only real fingers may claim look.
+	if (!PC || FingerIndex == ETouchIndex::CursorPointerIndex || LookFinger != ETouchIndex::MAX_TOUCHES)
+	{
+		return;
+	}
+
+	int32 ViewX = 0, ViewY = 0;
+	PC->GetViewportSize(ViewX, ViewY);
+	if (Location.X > ViewX * 0.5f)
+	{
+		LookFinger = FingerIndex;
+		LastTouchLocation = FVector2D(Location.X, Location.Y);
+	}
+}
+
+void ASeerCharacter::TouchMoved(ETouchIndex::Type FingerIndex, FVector Location)
+{
+	if (FingerIndex != LookFinger)
+	{
+		return;
+	}
+
+	const FVector2D Current(Location.X, Location.Y);
+	const FVector2D Delta = Current - LastTouchLocation;
+	LastTouchLocation = Current;
+	ApplyLookDelta(Delta.X * TouchDegPerPixel, Delta.Y * TouchDegPerPixel);
+}
+
+void ASeerCharacter::TouchEnded(ETouchIndex::Type FingerIndex, FVector Location)
+{
+	if (FingerIndex == LookFinger)
+	{
+		LookFinger = ETouchIndex::MAX_TOUCHES;
 	}
 }
