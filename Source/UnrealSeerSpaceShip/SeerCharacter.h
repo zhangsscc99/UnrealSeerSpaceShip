@@ -62,5 +62,6 @@ private:
 
 	int32 CameraPreset = 0;
 	ETouchIndex::Type LookFinger = ETouchIndex::MAX_TOUCHES;
+	ETouchIndex::Type JumpFinger = ETouchIndex::MAX_TOUCHES;
 	FVector2D LastTouchLocation = FVector2D::ZeroVector;
 };
