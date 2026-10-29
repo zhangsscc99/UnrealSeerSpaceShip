@@ -8,6 +8,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "SeerHUD.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "UObject/ConstructorHelpers.h"
@@ -212,18 +213,28 @@ void ASeerCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVector Locatio
 {
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	// bUseMouseForTouch makes the desktop mouse emit touches too; the mouse axes
-	// already drive the camera there, so only real fingers may claim look.
-	if (!PC || FingerIndex == ETouchIndex::CursorPointerIndex || LookFinger != ETouchIndex::MAX_TOUCHES)
+	// already drive the camera there, so only real fingers may claim a control.
+	if (!PC || FingerIndex == ETouchIndex::CursorPointerIndex)
 	{
 		return;
 	}
 
 	int32 ViewX = 0, ViewY = 0;
 	PC->GetViewportSize(ViewX, ViewY);
-	if (Location.X > ViewX * 0.5f)
+	const FVector2D ViewportSize(ViewX, ViewY);
+	const FVector2D Pos(Location.X, Location.Y);
+
+	if (JumpFinger == ETouchIndex::MAX_TOUCHES && ASeerHUD::GetJumpRect(ViewportSize).IsInside(Pos))
+	{
+		JumpFinger = FingerIndex;
+		Jump();
+		return;
+	}
+
+	if (LookFinger == ETouchIndex::MAX_TOUCHES && ASeerHUD::GetLookRect(ViewportSize).IsInside(Pos))
 	{
 		LookFinger = FingerIndex;
-		LastTouchLocation = FVector2D(Location.X, Location.Y);
+		LastTouchLocation = Pos;
 	}
 }
 
@@ -242,6 +253,11 @@ void ASeerCharacter::TouchMoved(ETouchIndex::Type FingerIndex, FVector Location)
 
 void ASeerCharacter::TouchEnded(ETouchIndex::Type FingerIndex, FVector Location)
 {
+	if (FingerIndex == JumpFinger)
+	{
+		JumpFinger = ETouchIndex::MAX_TOUCHES;
+		StopJumping();
+	}
 	if (FingerIndex == LookFinger)
 	{
 		LookFinger = ETouchIndex::MAX_TOUCHES;
