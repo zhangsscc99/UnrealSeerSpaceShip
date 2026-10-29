@@ -7,15 +7,16 @@
 class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
+class USpringArmComponent;
 struct FInputActionValue;
 
 /**
- * Player character for the 2.5D lab.
+ * Player character for the lab, with a third-person chase camera.
  *
- * Differences from the flying SpectatorPawn it replaces: CharacterMovement gives it
- * gravity and floor collision (no vertical drift), and bOrientRotationToMovement turns
- * the body towards the direction it walks. The camera is absolute, so the view never
- * moves even though the character rotates and walks around underneath it.
+ * Desktop: WASD walks (camera-relative), mouse orbits, Space jumps (twice for a
+ * double jump), C toggles the near/far camera preset.
+ * Mobile: the default touch interface's left virtual joystick moves; a drag that
+ * starts on the right half of the screen orbits the camera.
  */
 UCLASS()
 class UNREALSEERSPACESHIP_API ASeerCharacter : public ACharacter
@@ -29,9 +30,11 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
-	/** Absolute world transform: the view stays put while the character moves. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
-	TObjectPtr<UCameraComponent> FixedCamera;
+	TObjectPtr<USpringArmComponent> CameraBoom;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+	TObjectPtr<UCameraComponent> FollowCamera;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> MoveAction;
@@ -43,4 +46,21 @@ private:
 	void Move(const FInputActionValue& Value);
 	void MoveForward(float Value);
 	void MoveRight(float Value);
+
+	void Turn(float Value);
+	void LookUp(float Value);
+	void TurnRate(float Value);
+	void LookUpRate(float Value);
+	void CycleCamera();
+
+	void TouchStarted(ETouchIndex::Type FingerIndex, FVector Location);
+	void TouchMoved(ETouchIndex::Type FingerIndex, FVector Location);
+	void TouchEnded(ETouchIndex::Type FingerIndex, FVector Location);
+
+	void ApplyLookDelta(float DeltaYaw, float DeltaPitch);
+	void ApplyCameraPreset(int32 Index);
+
+	int32 CameraPreset = 0;
+	ETouchIndex::Type LookFinger = ETouchIndex::MAX_TOUCHES;
+	FVector2D LastTouchLocation = FVector2D::ZeroVector;
 };
