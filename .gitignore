@@ -32,3 +32,8 @@ BuildSetup/
 
 # MCP bridge session id (runtime only)
 Scripts/.uemcp_session
+
+# Ralph loop runtime state
+.ralph/
+# Temporary texture-cleaning output
+3dModelResources/cleaned/
