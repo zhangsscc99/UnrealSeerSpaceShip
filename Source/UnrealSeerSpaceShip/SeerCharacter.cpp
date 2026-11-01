@@ -168,7 +168,10 @@ void ASeerCharacter::Turn(float Value)
 
 void ASeerCharacter::LookUp(float Value)
 {
-	ApplyLookDelta(0.f, Value);
+	// MouseY is mapped with Scale=-1 in DefaultInput.ini (the engine-template
+	// convention). ApplyLookDelta adds straight to ControlRotation.Pitch, so the
+	// sign is flipped here: mouse up -> look up.
+	ApplyLookDelta(0.f, -Value);
 }
 
 void ASeerCharacter::TurnRate(float Value)
@@ -248,7 +251,8 @@ void ASeerCharacter::TouchMoved(ETouchIndex::Type FingerIndex, FVector Location)
 	const FVector2D Current(Location.X, Location.Y);
 	const FVector2D Delta = Current - LastTouchLocation;
 	LastTouchLocation = Current;
-	ApplyLookDelta(Delta.X * TouchDegPerPixel, Delta.Y * TouchDegPerPixel);
+	// Screen Y grows downwards, so negate it: dragging up looks up.
+	ApplyLookDelta(Delta.X * TouchDegPerPixel, -Delta.Y * TouchDegPerPixel);
 }
 
 void ASeerCharacter::TouchEnded(ETouchIndex::Type FingerIndex, FVector Location)
