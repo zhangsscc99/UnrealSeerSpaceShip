@@ -307,8 +307,20 @@ for b in range(1, BAYS):
     box(TEAL, -220.0, 220.0, yr - RIB_W * 0.5, yr + RIB_W * 0.5, 0.0, 3.0)
 
 # ---------------------------------------------------------------- end caps
-cap(CREAM, Y0 - 20.0, Y0)          # back wall behind the player
-cap(CREAM, Y1, Y1 + 20.0)          # far wall carrying the hatch
+# Back wall (world y -60..0 after the 3x actor scale) gets a 900 x 900 world
+# opening for the lab portal: local 300 x 300 at x -150..150, z 0..300.
+CAP_HOLE_HALF = 150.0
+CAP_HOLE_TOP = 300.0
+box(CREAM, -220.0, -CAP_HOLE_HALF, Y0 - 20.0, Y0, 0.0, 400.0)
+box(CREAM, CAP_HOLE_HALF, 220.0, Y0 - 20.0, Y0, 0.0, 400.0)
+box(CREAM, -CAP_HOLE_HALF, CAP_HOLE_HALF, Y0 - 20.0, Y0, CAP_HOLE_TOP, 400.0)
+cap(CREAM, Y1, Y1 + 20.0)          # far wall stays solid
+
+# Corridor-side collar around the cut and a thin floor bridge at the seam.
+box(TEAL, -166.7, -150.0, 0.0, 6.7, 0.0, 316.7)
+box(TEAL, 150.0, 166.7, 0.0, 6.7, 0.0, 316.7)
+box(TEAL, -166.7, 166.7, 0.0, 6.7, 300.0, 316.7)
+box(DARK, -150.0, 150.0, -30.0, 10.0, 0.0, 0.5)
 
 # ---------------------------------------------------------------- finish mesh
 # Blender Y maps to -Y in UE through FBX, so mirror the mesh to land the
