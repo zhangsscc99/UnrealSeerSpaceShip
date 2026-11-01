@@ -18,6 +18,9 @@ namespace
 	constexpr float MinPitch = -70.f;
 	constexpr float MaxPitch = 20.f;
 
+	constexpr float WalkSpeed = 520.f;
+	constexpr float SprintSpeed = 1050.f;
+
 	// Pixels of finger drag per degree of camera rotation.
 	constexpr float TouchDegPerPixel = 0.18f;
 
@@ -31,7 +34,7 @@ ASeerCharacter::ASeerCharacter()
 	GetCapsuleComponent()->InitCapsuleSize(34.f, 88.f);
 
 	UCharacterMovementComponent* Move = GetCharacterMovement();
-	Move->MaxWalkSpeed = 520.f;
+	Move->MaxWalkSpeed = WalkSpeed;
 	Move->BrakingDecelerationWalking = 2400.f;
 	Move->bOrientRotationToMovement = true;
 	Move->RotationRate = FRotator(0.f, 640.f, 0.f);
@@ -130,6 +133,8 @@ void ASeerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindAction(TEXT("Jump"), IE_Pressed, this, &ACharacter::Jump);
 	PlayerInputComponent->BindAction(TEXT("Jump"), IE_Released, this, &ACharacter::StopJumping);
 	PlayerInputComponent->BindAction(TEXT("CycleCamera"), IE_Pressed, this, &ASeerCharacter::CycleCamera);
+	PlayerInputComponent->BindAction(TEXT("Sprint"), IE_Pressed, this, &ASeerCharacter::StartSprint);
+	PlayerInputComponent->BindAction(TEXT("Sprint"), IE_Released, this, &ASeerCharacter::StopSprint);
 
 	PlayerInputComponent->BindTouch(IE_Pressed, this, &ASeerCharacter::TouchStarted);
 	PlayerInputComponent->BindTouch(IE_Repeat, this, &ASeerCharacter::TouchMoved);
@@ -187,6 +192,22 @@ void ASeerCharacter::LookUpRate(float Value)
 void ASeerCharacter::CycleCamera()
 {
 	ApplyCameraPreset((CameraPreset + 1) % 2);
+}
+
+void ASeerCharacter::StartSprint()
+{
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->MaxWalkSpeed = SprintSpeed;
+	}
+}
+
+void ASeerCharacter::StopSprint()
+{
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->MaxWalkSpeed = WalkSpeed;
+	}
 }
 
 void ASeerCharacter::ApplyCameraPreset(int32 Index)

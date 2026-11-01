@@ -13,8 +13,8 @@ struct FInputActionValue;
 /**
  * Player character for the lab, with a third-person chase camera.
  *
- * Desktop: WASD walks (camera-relative), mouse orbits, Space jumps (twice for a
- * double jump), C toggles the near/far camera preset.
+ * Desktop: WASD walks (camera-relative), Shift sprints, mouse orbits, Space
+ * jumps (twice for a double jump), C toggles the near/far camera preset.
  * Mobile: the default touch interface's left virtual joystick moves; a drag that
  * starts on the right half of the screen orbits the camera.
  */
@@ -52,6 +52,8 @@ private:
 	void TurnRate(float Value);
 	void LookUpRate(float Value);
 	void CycleCamera();
+	void StartSprint();
+	void StopSprint();
 
 	void TouchStarted(ETouchIndex::Type FingerIndex, FVector Location);
 	void TouchMoved(ETouchIndex::Type FingerIndex, FVector Location);

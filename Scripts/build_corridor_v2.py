@@ -310,46 +310,6 @@ for b in range(1, BAYS):
 cap(CREAM, Y0 - 20.0, Y0)          # back wall behind the player
 cap(CREAM, Y1, Y1 + 20.0)          # far wall carrying the hatch
 
-# ---------------------------------------------------------------- far hatch (y = Y1)
-CZ = 200.0
-# surround ring (fits inside the tunnel cross-section)
-annulus_xz(TEAL, 0.0, CZ, 168.0, 195.0, Y1 - 8.0, Y1, seg=64)
-# hatch outer ring + disc
-annulus_xz(TEAL, 0.0, CZ, 146.0, 168.0, Y1 - 12.0, Y1, seg=64)
-disc_xz(CREAM, 0.0, CZ, 146.0, Y1 - 11.0, Y1 - 1.0, seg=64)
-# concentric teal rings
-for rr in (126.0, 96.0, 66.0):
-    annulus_xz(TEAL, 0.0, CZ, rr, rr + 5.0, Y1 - 13.0, Y1 - 11.0, seg=64)
-# amber segmented ring
-for k in range(8):
-    a0 = k * math.pi / 4.0 + math.radians(6.0)
-    a1 = (k + 1) * math.pi / 4.0 - math.radians(6.0)
-    annulus_xz(AMBER, 0.0, CZ, 110.0, 122.0, Y1 - 14.0, Y1 - 12.0, seg=20, a_start=a0, a_end=a1)
-# spokes
-for k in range(4):
-    a = k * math.pi / 2.0 + math.pi / 4.0
-    cx, cz = math.cos(a) * 81.0, math.sin(a) * 81.0
-    dx, dz = math.cos(a), math.sin(a)
-    px, pz = -dz, dx
-    hw, hl = 4.5, 15.0
-    corners = []
-    for sy in (Y1 - 13.0, Y1 - 11.0):
-        for sx, sz in ((-hl, -hw), (hl, -hw), (hl, hw), (-hl, hw)):
-            corners.append((cx + dx * sx + px * sz, sy, CZ + cz + dz * sx + pz * sz))
-    vs = [bm.verts.new(c) for c in corners]
-    for f in ((0, 1, 2, 3), (4, 7, 6, 5), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)):
-        face = bm.faces.new([vs[i] for i in f])
-        face.material_index = TEAL
-# hub
-disc_xz(CREAM, 0.0, CZ, 32.0, Y1 - 13.0, Y1 - 9.0, seg=40)
-disc_xz(GLOWW, 0.0, CZ, 20.0, Y1 - 14.2, Y1 - 13.0, seg=40)
-
-# ---------------------------------------------------------------- back hatch (y = Y0)
-annulus_xz(TEAL, 0.0, CZ, 146.0, 168.0, Y0, Y0 + 8.0, seg=64)
-disc_xz(CREAM, 0.0, CZ, 146.0, Y0 + 1.0, Y0 + 7.0, seg=64)
-annulus_xz(TEAL, 0.0, CZ, 96.0, 101.0, Y0 + 7.0, Y0 + 8.0, seg=64)
-disc_xz(GLOWW, 0.0, CZ, 20.0, Y0 + 7.0, Y0 + 8.0, seg=40)
-
 # ---------------------------------------------------------------- finish mesh
 # Blender Y maps to -Y in UE through FBX, so mirror the mesh to land the
 # corridor on +Y in UE (y = -20 .. 3620, matching the old SM_CorrShell).
