@@ -14,5 +14,11 @@ public class UnrealSeerSpaceShip : ModuleRules
 			"InputCore",
 			"EnhancedInput",
 		});
+
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"Slate",
+			"SlateCore",
+		});
 	}
 }
